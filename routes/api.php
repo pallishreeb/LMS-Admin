@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\BookController;
-
+use App\Http\Controllers\Api\ChatController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -33,3 +33,9 @@ Route::post('/auth/logout',[AuthController::class,'logout'])->middleware('auth:s
 
 Route::get('/categories', [CategoryController::class, 'allCategories']);
 Route::get('/books', [BookController::class, 'getBooks']);
+
+Route::group(['prefix' => 'chat'], function () {
+    Route::get('messages',[ChatController::class, 'getMessages']);
+    Route::post('send', [ChatController::class, 'sendMessage']);
+    Route::delete('/messages/{id}', [ChatController::class, 'deleteMessage']);
+});
