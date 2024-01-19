@@ -11,31 +11,20 @@ use Illuminate\Support\Facades\DB;
 
 class ChatController extends Controller
 {
-        // Function to retrieve chat messages
-        // public function getMessages()
-        // {
-        //     $messages = ChatMessage::with('user')->orderBy('created_at', 'asc')->get();
-    
-        //     return response()->json(['messages' => $messages]);
-        // }
-        public function getMessages(Request $request)
-{
-    try {
-        $user_id = $request->input('user_id');
-
-        // Add condition to fetch messages only for the specified user_id
-        $messages = ChatMessage::with('user')
-            ->when($user_id, function ($query) use ($user_id) {
-                $query->where('user_id', $user_id);
-            })
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        return response()->json(['messages' => $messages]);
-    } catch (\Exception $e) {
-        return response()->json(['error' => 'Error fetching messages'], 500);
-    }
-}
+        public function getMessages(Request $request, $user_id)
+        {
+            try {
+                // Use $user_id as needed in your logic
+                $messages = ChatMessage::with('user')
+                    ->where('user_id', $user_id)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+        
+                return response()->json(['messages' => $messages]);
+            } catch (\Exception $e) {
+                return response()->json(['error' => 'Error fetching messages'], 500);
+            }
+        }
   
         // Function to send a new chat message
         public function sendMessage(Request $request)
@@ -62,11 +51,6 @@ class ChatController extends Controller
     try {
         $user = Auth::user();
         $message = ChatMessage::findOrFail($id);
-
-        // Check if the user is authorized to delete the message
-        if ($user->id !== $message->user_id && !$user->is_admin) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
 
         // Use a database transaction to ensure consistency
         DB::beginTransaction();
