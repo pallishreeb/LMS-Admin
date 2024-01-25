@@ -10,6 +10,7 @@ use Hash;
 use App\Mail\OtpMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Twilio\Rest\Client;
 class AuthController extends Controller
 {
     public function register(Request $request){
@@ -19,6 +20,7 @@ class AuthController extends Controller
             'email'=>'required|email|unique:users',
             'password'=>'required|min:6|max:100',
             'mobile_number'=> 'required',
+            'device_id'=>'required'
         ]);
 
         if ($validator->fails()) {
@@ -33,13 +35,39 @@ class AuthController extends Controller
             'email'=>$request->email,
             'password'=>Hash::make($request->password),
             'mobile_number'=> $request->mobile_number,
+            'device_id'=>$request->device_id
         ]);
 
-       // sendOtp($request);
-        return response()->json([
-            'message'=>'Registration successfull',
-            'data'=>$user
-        ],200);
+       // sendOtp
+       if ($user) {
+        // Generate OTP
+        $otp = Str::random(6);
+
+        // Store OTP and its expiration time in the user's record
+        $user->update([
+            'otp' => $otp,
+            'otp_valid_until' => now()->addMinutes(5),
+        ]);
+
+        // Send OTP via email
+        Mail::to($user->email)->send(new OtpMail($otp));
+        // Use Twilio to send the OTP via SMS
+        $account_sid = getenv('TWILIO_ACCOUNT_SID');
+        $auth_token = getenv('TWILIO_AUTH_TOKEN');
+        $twilio_number = getenv('TWILIO_PHONE_NUMBER');
+
+        $client = new Client($account_sid, $auth_token);
+        $client->messages->create(
+            // Where to send a text message
+            '+918144128737',
+            array(
+                'from' => $twilio_number,
+                'body' => 'Your OTP is: ' . $otp,
+            )
+        );
+        return response()->json(['message' => 'Registration successfull. OTP sent to email and mobile number']);
+    }
+
     }
 
     public function verifyOtp(Request $request)
@@ -69,6 +97,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email'=>'required|email',
             'password'=>'required',
+            'device_id'=>'required'
         ]);
 
         if ($validator->fails()) {
@@ -77,13 +106,41 @@ class AuthController extends Controller
                 'errors'=>$validator->errors()
             ],422);
         }
-
         $user=User::where('email',$request->email)->first();
-
         if($user){
+        // Check if the provided device_id matches the stored device_id
+        $deviceMatch = $request->device_id === $user->device_id;
+            if ($deviceMatch == false) {
+                // Generate OTP
+                $otp = Str::random(6);
+        
+                // Store OTP and its expiration time in the user's record
+                $user->update([
+                    'otp' => $otp,
+                    'otp_valid_until' => now()->addMinutes(5),
+                    'device_id' =>$request->device_id
+                ]);
+        
+                // Send OTP via email
+                Mail::to($user->email)->send(new OtpMail($otp));
+                // Use Twilio to send the OTP via SMS
+                $account_sid = getenv('TWILIO_ACCOUNT_SID');
+                $auth_token = getenv('TWILIO_AUTH_TOKEN');
+                $twilio_number = getenv('TWILIO_PHONE_NUMBER');
+        
+                $client = new Client($account_sid, $auth_token);
+                $client->messages->create(
+                    // Where to send a text message
+                    '+918144128737',
+                    array(
+                        'from' => $twilio_number,
+                        'body' => 'Your OTP is: ' . $otp,
+                    )
+                );
+                return response()->json(['message' => 'Login successfull. OTP sent to email and mobile number'],200);
+            }
 
             if(Hash::check($request->password,$user->password)){
-
                 $token=$user->createToken('auth-token')->plainTextToken;
 
                 return response()->json([
@@ -97,17 +154,11 @@ class AuthController extends Controller
                     'message'=>'Incorrect credentials',
                 ],400); 
             }
-
         }else{
-
             return response()->json([
                 'message'=>'Incorrect credentials',
             ],400); 
         }
-
-
-
-
     }
 
     public function user(Request $request){
@@ -136,12 +187,25 @@ class AuthController extends Controller
             // Store OTP and its expiration time in the user's record
             $user->update([
                 'otp' => $otp,
-                'otp_valid_until' => now()->addMinutes(5), // Adjust the expiration time as needed
+                'otp_valid_until' => now()->addMinutes(5),
             ]);
 
             // Send OTP via email
             Mail::to($user->email)->send(new OtpMail($otp));
+            // Use Twilio to send the OTP via SMS
+            $account_sid = getenv('TWILIO_ACCOUNT_SID');
+            $auth_token = getenv('TWILIO_AUTH_TOKEN');
+            $twilio_number = getenv('TWILIO_PHONE_NUMBER');
 
+            $client = new Client($account_sid, $auth_token);
+            $client->messages->create(
+                // Where to send a text message
+                '+918144128737',
+                array(
+                    'from' => $twilio_number,
+                    'body' => 'Your OTP is: ' . $otp,
+                )
+            );
             return response()->json(['message' => 'OTP sent successfully']);
         }
 
